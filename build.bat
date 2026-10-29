@@ -13,7 +13,7 @@ echo       Building RevitTrueGltf Release %ZIP_VERSION%
 echo ================================================
 
 :: Iterate over all supported Revit versions
-for %%V in (2020 2021 2022 2023 2024 2025 2026) do (
+for %%V in (2020 2021 2022 2023 2024 2025 2026 2027) do (
     set REVIT_VERSION=%%V
     set CONFIG=Release%%V
     
@@ -38,7 +38,6 @@ for %%V in (2020 2021 2022 2023 2024 2025 2026) do (
         if exist "!ZIP_PATH!" del /f /q "!ZIP_PATH!"
         
         echo [3/3] Packaging to !ZIP_NAME!...
-        :: Call built-in PowerShell to compress the folder without third-party tools like WinRAR
         powershell -NoProfile -Command "Compress-Archive -Path '!OUT_DIR!\*' -DestinationPath '!ZIP_PATH!' -Force"
         
         echo       Done.

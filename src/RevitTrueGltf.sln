@@ -1,4 +1,4 @@
-﻿
+
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.12.35707.178
@@ -19,6 +19,7 @@ Global
 		Debug2024|Any CPU = Debug2024|Any CPU
 		Debug2025|Any CPU = Debug2025|Any CPU
 		Debug2026|Any CPU = Debug2026|Any CPU
+		Debug2027|Any CPU = Debug2027|Any CPU
 		Release2020|Any CPU = Release2020|Any CPU
 		Release2021|Any CPU = Release2021|Any CPU
 		Release2022|Any CPU = Release2022|Any CPU
@@ -26,6 +27,7 @@ Global
 		Release2024|Any CPU = Release2024|Any CPU
 		Release2025|Any CPU = Release2025|Any CPU
 		Release2026|Any CPU = Release2026|Any CPU
+		Release2027|Any CPU = Release2027|Any CPU
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
 		{62500D41-B5D4-401C-A0FB-2EA145E80CE2}.Debug2020|Any CPU.ActiveCfg = Debug2020|Any CPU
@@ -42,6 +44,8 @@ Global
 		{62500D41-B5D4-401C-A0FB-2EA145E80CE2}.Debug2025|Any CPU.Build.0 = Debug2025|Any CPU
 		{62500D41-B5D4-401C-A0FB-2EA145E80CE2}.Debug2026|Any CPU.ActiveCfg = Debug2026|Any CPU
 		{62500D41-B5D4-401C-A0FB-2EA145E80CE2}.Debug2026|Any CPU.Build.0 = Debug2026|Any CPU
+		{62500D41-B5D4-401C-A0FB-2EA145E80CE2}.Debug2027|Any CPU.ActiveCfg = Debug2027|Any CPU
+		{62500D41-B5D4-401C-A0FB-2EA145E80CE2}.Debug2027|Any CPU.Build.0 = Debug2027|Any CPU
 		{62500D41-B5D4-401C-A0FB-2EA145E80CE2}.Release2020|Any CPU.ActiveCfg = Release2020|Any CPU
 		{62500D41-B5D4-401C-A0FB-2EA145E80CE2}.Release2020|Any CPU.Build.0 = Release2020|Any CPU
 		{62500D41-B5D4-401C-A0FB-2EA145E80CE2}.Release2021|Any CPU.ActiveCfg = Release2021|Any CPU
@@ -56,6 +60,8 @@ Global
 		{62500D41-B5D4-401C-A0FB-2EA145E80CE2}.Release2025|Any CPU.Build.0 = Release2025|Any CPU
 		{62500D41-B5D4-401C-A0FB-2EA145E80CE2}.Release2026|Any CPU.ActiveCfg = Release2026|Any CPU
 		{62500D41-B5D4-401C-A0FB-2EA145E80CE2}.Release2026|Any CPU.Build.0 = Release2026|Any CPU
+		{62500D41-B5D4-401C-A0FB-2EA145E80CE2}.Release2027|Any CPU.ActiveCfg = Release2027|Any CPU
+		{62500D41-B5D4-401C-A0FB-2EA145E80CE2}.Release2027|Any CPU.Build.0 = Release2027|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

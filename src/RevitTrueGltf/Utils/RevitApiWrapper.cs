@@ -3,33 +3,25 @@ using Autodesk.Revit.DB;
 namespace RevitTrueGltf.Utils
 {
     /// <summary>
-    /// Bridge for Revit API differences between different versions (2020-2026).
+    /// Bridge for Revit API differences between different versions (2020-2027).
     /// Centralizes all #if preprocessor directives to keep business logic clean.
     /// </summary>
     public static class RevitApiWrapper
     {
-        /// <summary>
-        /// Gets the persistent ID value (Long in 2024+, Int in 2020-2023).
-        /// </summary>
         public static long GetIdValue(this ElementId id)
         {
             if (id == null) return -1;
-#if REVIT2024 || REVIT2025 || REVIT2026
+#if REVIT2024 || REVIT2025 || REVIT2026 || REVIT2027
             return id.Value;
 #else
             return id.IntegerValue;
 #endif
         }
 
-
-        /// <summary>
-        /// Safely extracts the SymbolId from an InstanceNode.
-        /// In modern Revit, this acts as an extension method.
-        /// </summary>
         public static ElementId GetSymbolId(this InstanceNode node)
         {
             if (node == null) return ElementId.InvalidElementId;
-#if REVIT2024 || REVIT2025 || REVIT2026
+#if REVIT2024 || REVIT2025 || REVIT2026 || REVIT2027
             return node.GetSymbolGeometryId().SymbolId;
 #else
             return node.GetSymbolId();
@@ -39,7 +31,7 @@ namespace RevitTrueGltf.Utils
         public static string GetCategoryKey(Category category)
         {
             if (category == null) return "None";
-#if REVIT2024 || REVIT2025 || REVIT2026
+#if REVIT2024 || REVIT2025 || REVIT2026 || REVIT2027
             return ((BuiltInCategory)(int)category.Id.Value).ToString();
 #else
             return ((BuiltInCategory)category.Id.IntegerValue).ToString();
@@ -48,7 +40,7 @@ namespace RevitTrueGltf.Utils
 
         public static string GetParameterGroupKey(Definition definition)
         {
-#if REVIT2024 || REVIT2025 || REVIT2026
+#if REVIT2024 || REVIT2025 || REVIT2026 || REVIT2027
             return definition.GetGroupTypeId()?.TypeId ?? "";
 #else
             return definition.ParameterGroup.ToString();
@@ -57,7 +49,7 @@ namespace RevitTrueGltf.Utils
 
         public static string GetParameterGroupName(Definition definition)
         {
-#if REVIT2024 || REVIT2025 || REVIT2026
+#if REVIT2024 || REVIT2025 || REVIT2026 || REVIT2027
             var typeId = definition.GetGroupTypeId();
             return typeId != null ? LabelUtils.GetLabelForGroup(typeId) : "";
 #else
@@ -68,14 +60,11 @@ namespace RevitTrueGltf.Utils
         public static string GetParameterUnitType(Definition definition)
         {
             if (definition == null) return "None";
-#if REVIT2023 || REVIT2024 || REVIT2025 || REVIT2026
-            // In Revit 2023+, GetSpecTypeId() was replaced by GetDataType()
+#if REVIT2023 || REVIT2024 || REVIT2025 || REVIT2026 || REVIT2027
             return definition.GetDataType()?.TypeId ?? "None";
 #elif REVIT2021 || REVIT2022
-            // In Revit 2021-2022, UnitType was replaced by SpecTypeId
             return definition.GetSpecTypeId()?.TypeId ?? "None";
 #else
-            // Legacy versions (Revit 2020)
             try {
                 return definition.UnitType.ToString();
             } catch { return "None"; }
