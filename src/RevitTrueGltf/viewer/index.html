@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>RevitTrueGltf Live</title>
+<style>
+html,body{margin:0;height:100%;overflow:hidden;background:#202124;font:13px "Segoe UI",sans-serif;color:#e8e8e8}
+#hud{position:fixed;top:10px;left:10px;background:rgba(0,0,0,.6);padding:8px 10px;border-radius:6px;display:flex;gap:8px;align-items:center}
+#hud button{background:#3c4043;color:#e8e8e8;border:1px solid #5f6368;border-radius:4px;padding:4px 8px;cursor:pointer}
+#hud button.on{background:#1a73e8;border-color:#1a73e8}
+#status{min-width:190px}
+</style>
+<script type="importmap">
+{"imports":{
+"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+"three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/",
+"three/examples/jsm/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/",
+"three-mesh-bvh":"https://cdn.jsdelivr.net/npm/three-mesh-bvh@0.8.3/build/index.module.js",
+"three-gpu-pathtracer":"https://cdn.jsdelivr.net/npm/three-gpu-pathtracer@0.0.23/build/index.module.js"
+}}
+</script>
+</head>
+<body>
+<div id="hud"><span id="status">Подключение…</span><button id="pt">Path tracing</button><button id="fit">Вписать</button><button id="shot">Скриншот</button></div>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { KTX2Loader } from 'three/addons/loaders/KTX2Loader.js';
+import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+
+const statusEl = document.getElementById('status');
+const setStatus = t => { statusEl.textContent = t; };
+
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0xbfd1e5);
+const pmrem = new THREE.PMREMGenerator(renderer);
+scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+
+const camera = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 0.1, 10000);
+camera.position.set(30, 20, 30);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+
+scene.add(new THREE.HemisphereLight(0xffffff, 0x8d7c6a, 0.6));
+const sun = new THREE.DirectionalLight(0xffffff, 2.5);
+sun.castShadow = true;
+sun.shadow.mapSize.set(4096, 4096);
+sun.shadow.bias = -0.0005;
+sun.shadow.normalBias = 0.02;
+scene.add(sun, sun.target);
+
+const loader = new GLTFLoader();
+const ktx2 = new KTX2Loader()
+  .setTranscoderPath('https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/libs/basis/')
+  .detectSupport(renderer);
+loader.setKTX2Loader(ktx2);
+loader.setMeshoptDecoder(MeshoptDecoder);
+
+let model = null, loadedVersion = 0, loading = false, pending = 0, firstLoad = true;
+let pt = null, ptOn = false;
+const ptBtn = document.getElementById('pt');
+
+function bounds(obj) {
+  const box = new THREE.Box3().setFromObject(obj);
+  return {
+    center: box.getCenter(new THREE.Vector3()),
+    radius: Math.max(box.getSize(new THREE.Vector3()).length() / 2, 0.1)
+  };
+}
+
+function fit() {
+  if (!model) return;
+  const { center, radius } = bounds(model);
+  controls.target.copy(center);
+  camera.near = radius / 500;
+  camera.far = radius * 20;
+  camera.position.copy(center).add(new THREE.Vector3(1, 0.6, 1).normalize().multiplyScalar(radius * 2.2));
+  camera.updateProjectionMatrix();
+  controls.update();
+  if (pt) pt.updateCamera();
+}
+
+function placeSun() {
+  const { center, radius } = bounds(model);
+  sun.position.copy(center).add(new THREE.Vector3(0.6, 1.2, 0.4).normalize().multiplyScalar(radius * 2));
+  sun.target.position.copy(center);
+  sun.target.updateMatrixWorld();
+  const c = sun.shadow.camera;
+  c.left = -radius; c.right = radius; c.top = radius; c.bottom = -radius;
+  c.near = 0.1; c.far = radius * 4;
+  c.updateProjectionMatrix();
+}
+
+function disposeObject(obj) {
+  obj.traverse(o => {
+    if (o.geometry) o.geometry.dispose();
+    if (o.material) {
+      (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => {
+        for (const k in m) if (m[k] && m[k].isTexture) m[k].dispose();
+        m.dispose();
+      });
+    }
+  });
+}
+
+async function load(version) {
+  if (version <= loadedVersion) return;
+  if (loading) { pending = Math.max(pending, version); return; }
+  loading = true;
+  setStatus('Загрузка модели…');
+  const t0 = performance.now();
+  try {
+    const gltf = await loader.loadAsync('/model.glb?v=' + version);
+    const root = gltf.scene;
+    root.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+    if (model) { scene.remove(model); disposeObject(model); }
+    model = root;
+    scene.add(model);
+    loadedVersion = version;
+    placeSun();
+    if (firstLoad) { fit(); firstLoad = false; }
+    if (ptOn && pt) pt.setScene(scene, camera);
+    setStatus('Версия ' + version + ' · ' + Math.round(performance.now() - t0) + ' мс');
+  } catch (e) {
+    console.error(e);
+    setStatus('Ошибка загрузки: ' + e.message);
+  } finally {
+    loading = false;
+    if (pending > loadedVersion) { const p = pending; pending = 0; load(p); }
+  }
+}
+
+const events = new EventSource('/events');
+events.addEventListener('version', e => load(parseInt(e.data, 10)));
+events.addEventListener('status', e => {
+  const s = e.data;
+  if (s === 'changed') setStatus('Изменения в Revit…');
+  else if (s === 'exporting') setStatus('Экспорт из Revit…');
+  else if (s === 'stopped') { setStatus('Live Viewer остановлен в Revit'); events.close(); }
+  else if (s.startsWith('error')) setStatus('Ошибка экспорта: ' + s.slice(6));
+});
+events.onerror = () => setStatus('Нет связи с Revit');
+
+ptBtn.onclick = async () => {
+  ptOn = !ptOn;
+  ptBtn.classList.toggle('on', ptOn);
+  if (!ptOn) { ptBtn.textContent = 'Path tracing'; return; }
+  try {
+    if (!pt) {
+      setStatus('Загрузка path tracer…');
+      const { WebGLPathTracer } = await import('three-gpu-pathtracer');
+      pt = new WebGLPathTracer(renderer);
+    }
+    pt.setScene(scene, camera);
+    setStatus('Path tracing');
+  } catch (e) {
+    console.error(e);
+    ptOn = false;
+    ptBtn.classList.remove('on');
+    setStatus('Path tracer не загрузился: ' + e.message);
+  }
+};
+
+controls.addEventListener('change', () => { if (ptOn && pt) pt.updateCamera(); });
+document.getElementById('fit').onclick = fit;
+document.getElementById('shot').onclick = () => {
+  const a = document.createElement('a');
+  a.href = renderer.domElement.toDataURL('image/png');
+  a.download = 'render.png';
+  a.click();
+};
+
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+  if (pt) pt.updateCamera();
+});
+
+renderer.setAnimationLoop(() => {
+  controls.update();
+  if (ptOn && pt) {
+    pt.renderSample();
+    ptBtn.textContent = 'Path tracing · ' + Math.floor(pt.samples);
+  } else {
+    renderer.render(scene, camera);
+  }
+});
+</script>
+</body>
+</html>

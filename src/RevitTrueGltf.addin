@@ -2,7 +2,7 @@
 <RevitAddIns>
   <AddIn Type="Command">
     <!-- Replace the path below with your actual compiled DLL path -->
-    <!-- Example: F:\RevitTrueGltf\bin\2024\RevitTrueGltf.dll -->
+    <!-- Example: F:\RevitTrueGltf\bin\2027\RevitTrueGltf.dll -->
     <Assembly>YOUR_LOCAL_BIN_PATH\RevitTrueGltf.dll</Assembly>
     <ClientId>B6E0B3F1-3C34-4B7E-971B-6E3F405A12D5</ClientId>
     <FullClassName>RevitTrueGltf.ExportGltfCommand</FullClassName>
@@ -11,5 +11,15 @@
     <VendorId>RevitTrueGltf</VendorId>
     <VendorDescription>RevitTrueGltf Open Source Project</VendorDescription>
     <VisibilityMode>AlwaysVisible</VisibilityMode>
+  </AddIn>
+  <AddIn Type="Command">
+    <Assembly>YOUR_LOCAL_BIN_PATH\RevitTrueGltf.dll</Assembly>
+    <ClientId>7F3C2A9E-5B1D-4E8A-9C6F-2D4B8E1A7C35</ClientId>
+    <FullClassName>RevitTrueGltf.Live.LiveViewerCommand</FullClassName>
+    <Text>Live Viewer On/Off</Text>
+    <Description>Real-time Three.js viewer of the active 3D view with live sync and path tracing.</Description>
+    <VendorId>RevitTrueGltf</VendorId>
+    <VendorDescription>RevitTrueGltf Open Source Project</VendorDescription>
+    <VisibilityMode>NotVisibleWhenNoActiveDocument</VisibilityMode>
   </AddIn>
 </RevitAddIns>
