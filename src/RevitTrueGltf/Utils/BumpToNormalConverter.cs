@@ -1,83 +1,111 @@
 using SharpGLTF.Memory;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.PixelFormats;
 using System;
+using System.Drawing;
+using System.Drawing.Imaging;
 using System.IO;
 using System.Numerics;
+using System.Runtime.InteropServices;
 
 namespace RevitTrueGltf.Utils
 {
     /// <summary>
-    /// Utility class specifically dedicated to converting Revit thickness/bump maps
-    /// into tangent-space normal maps suitable for the glTF format.
+    /// Converts Revit grayscale bump maps into tangent-space normal maps for glTF.
+    /// Uses System.Drawing (GDI+), which is already loaded by Revit: no extra native
+    /// dependencies, no third-party license.
     /// </summary>
     public static class BumpToNormalConverter
     {
-        /// <summary>
-        /// Reads a grayscale height map (bump map) and converts it into a tangent-space normal map
-        /// stored directly as a SharpGLTF MemoryImage, avoiding intermediate external byte arrays.
-        /// </summary>
-        /// <param name="bumpPath">Path to the physical bump texture file.</param>
-        /// <param name="strength">Strength of the normal effect.</param>
-        /// <returns>A MemoryImage representing the generated PNG normal map.</returns>
         public static MemoryImage Convert(string bumpPath, float strength = 2.0f)
         {
-            using (var img = Image.Load<Rgba32>(bumpPath))
+            int w, h;
+            byte[] height;
+            using (var src = LoadBitmap(bumpPath))
             {
-                int w = img.Width;
-                int h = img.Height;
-                using (var normalImg = new Image<Rgba32>(w, h))
+                w = src.Width;
+                h = src.Height;
+                height = ReadRedChannel(src);
+            }
+
+            var bgra = new byte[w * h * 4];
+            for (int y = 0; y < h; y++)
+            {
+                int yUp = Math.Max(0, y - 1);
+                int yDown = Math.Min(h - 1, y + 1);
+                for (int x = 0; x < w; x++)
+                {
+                    int xLeft = Math.Max(0, x - 1);
+                    int xRight = Math.Min(w - 1, x + 1);
+
+                    float left = height[y * w + xLeft] / 255f;
+                    float right = height[y * w + xRight] / 255f;
+                    float up = height[yUp * w + x] / 255f;
+                    float down = height[yDown * w + x] / 255f;
+
+                    float dx = (right - left) * strength;
+                    float dy = (up - down) * strength;
+
+                    var n = Vector3.Normalize(new Vector3(-dx, dy, 1.0f));
+
+                    int i = (y * w + x) * 4;
+                    bgra[i] = (byte)((n.Z * 0.5f + 0.5f) * 255.0f);
+                    bgra[i + 1] = (byte)((n.Y * 0.5f + 0.5f) * 255.0f);
+                    bgra[i + 2] = (byte)((n.X * 0.5f + 0.5f) * 255.0f);
+                    bgra[i + 3] = 255;
+                }
+            }
+
+            using (var dst = new Bitmap(w, h, PixelFormat.Format32bppArgb))
+            {
+                var data = dst.LockBits(new Rectangle(0, 0, w, h), ImageLockMode.WriteOnly, PixelFormat.Format32bppArgb);
+                try
                 {
                     for (int y = 0; y < h; y++)
-                    {
-                        for (int x = 0; x < w; x++)
-                        {
-                            int xLeft = Math.Max(0, x - 1);
-                            int xRight = Math.Min(w - 1, x + 1);
-                            int yUp = Math.Max(0, y - 1);
-                            int yDown = Math.Min(h - 1, y + 1);
-
-                            // Assuming the bump map is grayscale, read the R channel to represent height (0 to 1)
-                            float left = img[xLeft, y].R / 255f;
-                            float right = img[xRight, y].R / 255f;
-                            float up = img[x, yUp].R / 255f;
-                            float down = img[x, yDown].R / 255f;
-
-                            // Finite difference calculation for gradients
-                            float dx = (right - left) * strength;
-
-                            // glTF normal map Y+ is UP. Image coordinates: Y+ is DOWN.
-                            float dy = (up - down) * strength;
-
-                            // Normal calculation: Z points outwards.
-                            var n = Vector3.Normalize(new Vector3(-dx, dy, 1.0f));
-
-                            // Remap [-1, 1] to [0, 255] for RGB storage
-                            byte r = (byte)((n.X * 0.5f + 0.5f) * 255.0f);
-                            byte g = (byte)((n.Y * 0.5f + 0.5f) * 255.0f);
-                            byte b = (byte)((n.Z * 0.5f + 0.5f) * 255.0f);
-
-                            normalImg[x, y] = new Rgba32(r, g, b, 255);
-                        }
-                    }
-
-                    // Save the resulting normal map image to a memory stream as PNG
-                    // Using an expandable MemoryStream allows zero-allocation buffer fetching
-                    using (var ms = new MemoryStream())
-                    {
-                        normalImg.SaveAsPng(ms);
-
-                        // Zero-Allocation Optimization: Try to get the underlying ArraySegment 
-                        // representing the valid range of data directly without allocating a new copied byte[] Array.
-                        if (ms.TryGetBuffer(out ArraySegment<byte> buffer))
-                        {
-                            return new MemoryImage(buffer);
-                        }
-
-                        // Fallback if TryGetBuffer fails (should dynamically never happen with a fresh MemoryStream)
-                        return new MemoryImage(ms.ToArray());
-                    }
+                        Marshal.Copy(bgra, y * w * 4, IntPtr.Add(data.Scan0, y * data.Stride), w * 4);
                 }
+                finally
+                {
+                    dst.UnlockBits(data);
+                }
+
+                using (var ms = new MemoryStream())
+                {
+                    dst.Save(ms, ImageFormat.Png);
+                    if (ms.TryGetBuffer(out ArraySegment<byte> buffer))
+                        return new MemoryImage(buffer);
+                    return new MemoryImage(ms.ToArray());
+                }
+            }
+        }
+
+        private static Bitmap LoadBitmap(string path)
+        {
+            using (var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+            using (var img = Image.FromStream(fs, false, false))
+            {
+                return new Bitmap(img);
+            }
+        }
+
+        private static byte[] ReadRedChannel(Bitmap bmp)
+        {
+            int w = bmp.Width;
+            int h = bmp.Height;
+            var data = bmp.LockBits(new Rectangle(0, 0, w, h), ImageLockMode.ReadOnly, PixelFormat.Format32bppArgb);
+            try
+            {
+                var row = new byte[w * 4];
+                var red = new byte[w * h];
+                for (int y = 0; y < h; y++)
+                {
+                    Marshal.Copy(IntPtr.Add(data.Scan0, y * data.Stride), row, 0, row.Length);
+                    for (int x = 0; x < w; x++)
+                        red[y * w + x] = row[x * 4 + 2];
+                }
+                return red;
+            }
+            finally
+            {
+                bmp.UnlockBits(data);
             }
         }
     }
